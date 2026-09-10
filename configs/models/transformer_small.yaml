@@ -8,4 +8,4 @@ model:
   num_decoder_layers: 3
   feedforward_dim: 512
   dropout: 0.1
-  max_sequence_length: 64
+  max_sequence_length: 128
