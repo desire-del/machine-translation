@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from machine-translation!")
+"""Educational neural machine translation package."""

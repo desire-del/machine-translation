@@ -1,17 +1,20 @@
 [project]
-name = "machine-translation"
+name = "educational-nmt"
 version = "0.1.0"
-description = "Add your description here"
+description = "A small educational neural machine translation project"
 readme = "README.md"
-authors = [
-    { name = "Desire", email = "soussoudesire2019@gmail.com" }
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.10,<3",
+    "PyYAML>=6.0,<7",
+    "tiktoken>=0.14.0",
+    "torch>=2.14.0",
+    "torchvision>=0.29.0",
 ]
-requires-python = ">=3.12"
-dependencies = []
-
-[project.scripts]
-machine-translation = "machine_translation:main"
 
 [build-system]
-requires = ["uv_build>=0.12.5,<0.13.0"]
-build-backend = "uv_build"
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

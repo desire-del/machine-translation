@@ -1,0 +1,1 @@
+"""Small Transformer model placeholder."""

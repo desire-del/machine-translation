@@ -1,0 +1,8 @@
+schema_version: 1
+
+model:
+  name: seq2seq_lstm
+  embedding_dim: 256
+  hidden_dim: 512
+  num_layers: 1
+  dropout: 0.1

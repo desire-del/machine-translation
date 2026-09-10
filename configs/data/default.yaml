@@ -1,0 +1,13 @@
+schema_version: 1
+
+data:
+  name: parallel_corpus
+  source_language: en
+  target_language: fr
+  train_path: data/raw/train.tsv
+  validation_path: data/raw/validation.tsv
+  test_path: data/raw/test.tsv
+  max_sequence_length: 64
+  min_token_frequency: 2
+  batch_size: 64
+  num_workers: 0
