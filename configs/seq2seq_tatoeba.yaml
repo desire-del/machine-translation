@@ -1,0 +1,48 @@
+name: seq2seq_tatoeba
+seed: 42
+
+data:
+  dataset: tatoeba
+  split_seed: 42
+  source_language: en
+  target_language: fr
+  raw_path: data/raw/tatoeba-en-fr.zip
+  download_url: https://object.pouta.csc.fi/OPUS-Tatoeba/v2026-07-08/moses/en-fr.txt.zip
+  train_path: data/processed/tatoeba/train.parquet
+  validation_path: data/processed/tatoeba/validation.parquet
+  test_path: data/processed/tatoeba/test.parquet
+  validation_size: 5000
+  test_size: 5000
+  max_sequence_length: 64
+  batch_size: 64
+  num_workers: 0
+
+tokenizer:
+  type: bpe
+  shared: false
+  vocab_size: 8000
+  min_frequency: 2
+  deduplicate: true
+  source_artifact_path: artifacts/tokenizers/tatoeba_en_bpe.json
+  target_artifact_path: artifacts/tokenizers/tatoeba_fr_bpe.json
+  special_tokens:
+    pad: <pad>
+    unk: <unk>
+    bos: <bos>
+    eos: <eos>
+
+model:
+  type: seq2seq
+  embedding_dim: 256
+  hidden_dim: 512
+  num_layers: 2
+  dropout: 0.2
+
+training:
+  epochs: 10
+  learning_rate: 0.001
+  teacher_forcing_ratio: 1.0
+  gradient_clip_norm: 1.0
+  evaluate_every: 1
+  patience: 3
+  min_delta: 0.0

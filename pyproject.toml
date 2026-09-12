@@ -5,6 +5,7 @@ description = "A small educational neural machine translation project"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "einops>=0.8.2",
     "pandas>=2.3.3",
     "pyarrow>=25.0.1",
     "pydantic>=2.10,<3",
@@ -12,6 +13,7 @@ dependencies = [
     "scikit-learn>=1.7.2",
     "tokenizers>=0.23,<0.24",
     "torch>=2.14.0",
+    "tqdm>=4.70.0",
 ]
 
 [build-system]
@@ -25,4 +27,5 @@ where = ["src"]
 dev = [
     "ipykernel>=7.3.0",
     "jupyter>=1.1.1",
+    "matplotlib>=3.10.9",
 ]

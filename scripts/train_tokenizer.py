@@ -1,53 +1,90 @@
-"""Train and save the shared tokenizer."""
+"""Train and save the configured tokenizer."""
 
 import argparse
 
 import pandas as pd
 
-from machine_translation.config import load_data_config, load_tokenizer_config
+from machine_translation import load_config
 from machine_translation.tokenization import build_tokenizer, save_tokenizer
 
 
-DATA_CONFIG_PATH = "configs/data/default.yaml"
-TOKENIZER_CONFIG_PATH = "configs/tokenizers/shared_unigram.yaml"
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Train the shared tokenizer.")
+def parse_args():
+    parser = argparse.ArgumentParser(description="Train the tokenizer.")
     parser.add_argument(
-        "--data-config",
-        default=DATA_CONFIG_PATH,
-        help="data config path (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--tokenizer-config",
-        default=TOKENIZER_CONFIG_PATH,
-        help="tokenizer config path (default: %(default)s)",
+        "--config",
+        help="experiment YAML (default: configs/seq2seq_tatoeba.yaml)",
     )
     return parser.parse_args()
 
 
-def main() -> None:
+def main():
     args = parse_args()
-    data_config = load_data_config(args.data_config)
-    tokenizer_config = load_tokenizer_config(args.tokenizer_config)
-    columns = [tokenizer_config.source_column, tokenizer_config.target_column]
-
-    pairs = pd.read_parquet(data_config.train_path, columns=columns)
-    if tokenizer_config.deduplicate:
-        pairs = pairs.drop_duplicates()
-
-    texts = (
-        text
-        for pair in pairs.itertuples(index=False, name=None)
-        for text in pair
+    config = load_config(args.config)
+    data = config.data
+    tokens = config.tokenizer
+    source = data.source_language
+    target = data.target_language
+    columns = [source, target]
+    pairs = pd.read_parquet(data.train_path, columns=columns)
+    paths = list(
+        dict.fromkeys([tokens.source_artifact_path, tokens.target_artifact_path])
     )
-    tokenizer = build_tokenizer(texts, tokenizer_config)
-    artifact_path = save_tokenizer(tokenizer, tokenizer_config.artifact_path)
+    overwrite = False
+
+    existing = [path for path in paths if path.exists()]
+    if existing:
+        print("Existing tokenizer artifacts:")
+        for path in existing:
+            print(f"- {path}")
+
+        answer = input("Replace them? [y/N]: ").strip().lower()
+        if answer not in {"y", "yes", "o", "oui"}:
+            print("Tokenizer training cancelled.")
+            return
+        overwrite = True
+
+    def train(texts):
+        if tokens.deduplicate:
+            texts = texts.drop_duplicates()
+        return build_tokenizer(
+            texts=texts,
+            vocab_size=tokens.vocab_size,
+            special_tokens=tokens.special_tokens,
+            model_type=tokens.type,
+            min_frequency=tokens.min_frequency,
+        )
+
+    if tokens.shared:
+        texts = pd.concat(
+            [pairs[source], pairs[target]],
+            ignore_index=True,
+        )
+        tokenizer = train(texts)
+        path = save_tokenizer(tokenizer, paths[0], overwrite=overwrite)
+        print(f"Shared vocabulary: {tokenizer.get_vocab_size():,} -> {path}")
+    else:
+        source_tokenizer = train(pairs[source])
+        target_tokenizer = train(pairs[target])
+        source_path = save_tokenizer(
+            source_tokenizer,
+            tokens.source_artifact_path,
+            overwrite=overwrite,
+        )
+        target_path = save_tokenizer(
+            target_tokenizer,
+            tokens.target_artifact_path,
+            overwrite=overwrite,
+        )
+        print(
+            f"Source vocabulary: {source_tokenizer.get_vocab_size():,}"
+            f" -> {source_path}"
+        )
+        print(
+            f"Target vocabulary: {target_tokenizer.get_vocab_size():,}"
+            f" -> {target_path}"
+        )
 
     print(f"Training pairs: {len(pairs):,}")
-    print(f"Vocabulary size: {tokenizer.get_vocab_size():,}")
-    print(f"Tokenizer saved to: {artifact_path}")
 
 
 if __name__ == "__main__":

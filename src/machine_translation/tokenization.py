@@ -1,17 +1,17 @@
-"""Build, save, load and use the shared translation tokenizer."""
+"""Build, save, load and use translation tokenizers."""
 
 from collections.abc import Iterable
 from pathlib import Path
 
 from tokenizers import Encoding, Tokenizer
 from tokenizers.decoders import Metaspace as MetaspaceDecoder
-from tokenizers.models import Unigram
+from tokenizers.models import BPE, Unigram
 from tokenizers.normalizers import NFKC
 from tokenizers.pre_tokenizers import Metaspace as MetaspacePreTokenizer
 from tokenizers.processors import TemplateProcessing
-from tokenizers.trainers import UnigramTrainer
+from tokenizers.trainers import BpeTrainer, UnigramTrainer
 
-from machine_translation.config import SpecialTokensConfig, TokenizerConfig
+from machine_translation.config import SpecialTokensConfig
 
 
 class TokenizationError(ValueError):
@@ -61,28 +61,41 @@ def get_special_token_ids(
 
 def build_tokenizer(
     texts: Iterable[str],
-    config: TokenizerConfig,
+    vocab_size: int,
+    special_tokens: SpecialTokensConfig,
+    model_type: str = "unigram",
+    min_frequency: int = 2,
 ) -> Tokenizer:
-    """Build the configured shared Unigram tokenizer from raw texts."""
-    tokenizer = Tokenizer(Unigram())
+    """Build a BPE or Unigram tokenizer from raw texts."""
+    if model_type == "bpe":
+        tokenizer = Tokenizer(BPE(unk_token=special_tokens.unk))
+        trainer = BpeTrainer(
+            vocab_size=vocab_size,
+            min_frequency=min_frequency,
+            special_tokens=list(special_tokens.as_tuple()),
+        )
+    elif model_type == "unigram":
+        tokenizer = Tokenizer(Unigram())
+        trainer = UnigramTrainer(
+            vocab_size=vocab_size,
+            unk_token=special_tokens.unk,
+            special_tokens=list(special_tokens.as_tuple()),
+        )
+    else:
+        raise ValueError(f"Unknown tokenizer model: {model_type}")
+
     tokenizer.normalizer = NFKC()
     tokenizer.pre_tokenizer = MetaspacePreTokenizer()
     tokenizer.decoder = MetaspaceDecoder()
 
-    trainer = UnigramTrainer(
-        vocab_size=config.vocab_size,
-        unk_token=config.special_tokens.unk,
-        special_tokens=list(config.special_tokens.as_tuple()),
-    )
-
     tokenizer.train_from_iterator(_validated_texts(texts), trainer=trainer)
 
-    special_ids = get_special_token_ids(tokenizer, config.special_tokens)
+    special_ids = get_special_token_ids(tokenizer, special_tokens)
     tokenizer.post_processor = TemplateProcessing(
-        single=f"{config.special_tokens.bos} $A {config.special_tokens.eos}",
+        single=f"{special_tokens.bos} $A {special_tokens.eos}",
         special_tokens=[
-            (config.special_tokens.bos, special_ids["bos"]),
-            (config.special_tokens.eos, special_ids["eos"]),
+            (special_tokens.bos, special_ids["bos"]),
+            (special_tokens.eos, special_ids["eos"]),
         ],
     )
 

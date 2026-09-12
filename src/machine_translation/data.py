@@ -1,35 +1,19 @@
-"""Parallel-text dataset and batch preparation."""
+"""Parallel-text dataset and data loaders."""
 
-from collections.abc import Callable
 from pathlib import Path
 
 import pandas as pd
 import torch
-from pandas import DataFrame
-from tokenizers import Encoding, Tokenizer
 from torch.utils.data import DataLoader, Dataset
 
-from machine_translation.config import (
-    DataConfig,
-    SpecialTokensConfig,
-    TokenizerConfig,
-)
 from machine_translation.tokenization import encode_batch, get_special_token_ids
 
 
-class TranslationDataset(Dataset[tuple[str, str]]):
+class TranslationDataset(Dataset):
     """Store aligned source and target texts without tokenizing them."""
 
-    def __init__(
-        self,
-        data_path: str | Path | DataFrame,
-        source_column: str,
-        target_column: str,
-    ) -> None:
-        if isinstance(data_path, (str, Path)):
-            dataframe = pd.read_parquet(data_path)
-        else:
-            dataframe = data_path
+    def __init__(self, data, source_column, target_column):
+        dataframe = pd.read_parquet(data) if isinstance(data, (str, Path)) else data
 
         missing_columns = {source_column, target_column} - set(dataframe.columns)
         if missing_columns:
@@ -39,94 +23,92 @@ class TranslationDataset(Dataset[tuple[str, str]]):
         self.source_texts = dataframe[source_column].tolist()
         self.target_texts = dataframe[target_column].tolist()
 
-    def __len__(self) -> int:
+    def __len__(self):
         return len(self.source_texts)
 
-    def __getitem__(self, index: int) -> tuple[str, str]:
+    def __getitem__(self, index):
         return self.source_texts[index], self.target_texts[index]
 
 
-def _to_tensors(encodings: list[Encoding]) -> tuple[torch.Tensor, torch.Tensor]:
+def _to_tensors(encodings):
     ids = torch.tensor([encoding.ids for encoding in encodings], dtype=torch.long)
-    attention_mask = torch.tensor(
+    mask = torch.tensor(
         [encoding.attention_mask for encoding in encodings],
         dtype=torch.bool,
     )
-    return ids, attention_mask
+    return ids, mask
 
 
 def make_collate_fn(
-    tokenizer: Tokenizer,
-    special_tokens: SpecialTokensConfig,
-    max_sequence_length: int,
-) -> Callable[[list[tuple[str, str]]], dict[str, torch.Tensor]]:
-    """Create the batch function.
+    source_tokenizer,
+    target_tokenizer,
+    special_tokens,
+    max_sequence_length,
+):
+    """Create batches with padded IDs, lengths, and padding masks.
 
-    Returned shapes are ``source_ids[B, S]``, ``source_lengths[B]``,
-    ``source_padding_mask[B, S]``, ``target_ids[B, T]`` and
-    ``target_padding_mask[B, T]``. Padding masks are boolean and ``True`` marks
-    positions to ignore.
+    Shapes: source IDs ``[B, S]``, source lengths ``[B]``, source padding
+    mask ``[B, S]``, target IDs ``[B, T]`` and target padding mask ``[B, T]``.
+    A padding mask is boolean and ``True`` means "ignore this position".
     """
     if max_sequence_length < 2:
         raise ValueError("max_sequence_length must be at least 2")
 
-    special_ids = get_special_token_ids(tokenizer, special_tokens)
-    tokenizer.enable_truncation(max_length=max_sequence_length)
-    tokenizer.enable_padding(
-        direction="right",
-        pad_id=special_ids["pad"],
-        pad_token=special_tokens.pad,
-    )
+    for tokenizer in (source_tokenizer, target_tokenizer):
+        special_ids = get_special_token_ids(tokenizer, special_tokens)
+        tokenizer.enable_truncation(max_length=max_sequence_length)
+        tokenizer.enable_padding(
+            direction="right",
+            pad_id=special_ids["pad"],
+            pad_token=special_tokens.pad,
+        )
 
-    def collate_fn(batch: list[tuple[str, str]]) -> dict[str, torch.Tensor]:
+    def collate(batch):
         source_texts, target_texts = zip(*batch)
-        source_encodings = encode_batch(
-            tokenizer,
-            source_texts,
+        source_ids, source_mask = _to_tensors(
+            encode_batch(source_tokenizer, source_texts)
         )
-        target_encodings = encode_batch(
-            tokenizer,
-            target_texts,
+        target_ids, target_mask = _to_tensors(
+            encode_batch(target_tokenizer, target_texts)
         )
-
-        source_ids, source_attention_mask = _to_tensors(source_encodings)
-        target_ids, target_attention_mask = _to_tensors(target_encodings)
 
         return {
             "source_ids": source_ids,
-            "source_lengths": source_attention_mask.sum(dim=1),
-            "source_padding_mask": ~source_attention_mask,
+            "source_lengths": source_mask.sum(dim=1),
+            "source_padding_mask": ~source_mask,
             "target_ids": target_ids,
-            "target_padding_mask": ~target_attention_mask,
+            "target_padding_mask": ~target_mask,
         }
 
-    return collate_fn
+    return collate
 
 
 def get_data_loaders(
-    tokenizer: Tokenizer,
-    data_config: DataConfig,
-    tokenizer_config: TokenizerConfig,
-) -> tuple[DataLoader, DataLoader, DataLoader]:
+    source_tokenizer,
+    target_tokenizer,
+    data_config,
+    special_tokens,
+):
     """Return ``(train_loader, validation_loader, test_loader)``."""
-    collate_fn = make_collate_fn(
-        tokenizer,
-        tokenizer_config.special_tokens,
+    collate = make_collate_fn(
+        source_tokenizer,
+        target_tokenizer,
+        special_tokens,
         data_config.max_sequence_length,
     )
 
-    def create_loader(data_path: Path, shuffle: bool) -> DataLoader:
+    def create_loader(data_path, shuffle):
         dataset = TranslationDataset(
             data_path,
-            tokenizer_config.source_column,
-            tokenizer_config.target_column,
+            data_config.source_language,
+            data_config.target_language,
         )
         return DataLoader(
             dataset,
             batch_size=data_config.batch_size,
             shuffle=shuffle,
             num_workers=data_config.num_workers,
-            collate_fn=collate_fn,
+            collate_fn=collate,
         )
 
     return (
