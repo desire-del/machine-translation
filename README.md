@@ -1,5 +1,10 @@
 # Neural Machine Translation
 
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![uv](https://img.shields.io/badge/package%20manager-uv-6E56CF)](https://docs.astral.sh/uv/)
+[![Status](https://img.shields.io/badge/status-active%20development-orange)](#project-status)
+
 An educational English-to-French machine translation project built from
 first principles with PyTorch. The goal is to study how conditional sequence
 generation evolves from recurrent Seq2Seq models to attention-based models and
@@ -143,6 +148,7 @@ configuration is [`configs/seq2seq_tatoeba.yaml`](configs/seq2seq_tatoeba.yaml).
 
 ```yaml
 name: seq2seq_tatoeba
+description: Seq2Seq LSTM baseline on Tatoeba with separate English and French BPE tokenizers.
 seed: 42
 
 data:
@@ -181,6 +187,37 @@ data.
 
 Early stopping counts validation checks without an improvement greater than
 `min_delta`. Set `patience: null` to disable it.
+
+### Experiment naming
+
+Experiment identifiers follow this convention:
+
+```text
+<model>_<dataset>[_<variant>]
+```
+
+Examples:
+
+| Name | Purpose |
+| --- | --- |
+| `seq2seq_tatoeba` | Vanilla Seq2Seq baseline |
+| `seq2seq_tatoeba_tf050` | Seq2Seq with a 0.5 teacher-forcing ratio |
+| `bahdanau_tatoeba` | Bahdanau-attention experiment |
+| `transformer_tatoeba_small` | Small Transformer experiment |
+
+Keep `name` concise and filesystem-friendly. Use lowercase words separated by
+underscores, and add a variant only when it identifies the experimental change.
+The YAML filename should match the experiment name.
+
+Use `description` to record the hypothesis or the important difference in
+plain language. It is included in the run's `config.yaml` snapshot and in its
+checkpoints, while `seed` identifies repetitions of the same experiment:
+
+```yaml
+name: seq2seq_tatoeba_tf050
+description: Measure the effect of reducing teacher forcing from 1.0 to 0.5.
+seed: 42
+```
 
 Use another configuration with:
 

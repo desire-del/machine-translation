@@ -94,6 +94,7 @@ class TrainingConfig(ConfigModel):
 
 class Config(ConfigModel):
     name: str = Field(pattern=r"^[a-z0-9_]+$")
+    description: str = Field(min_length=1)
     seed: int = Field(ge=0)
     data: DataConfig
     tokenizer: TokenizerConfig

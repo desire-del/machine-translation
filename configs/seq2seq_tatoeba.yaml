@@ -1,4 +1,5 @@
 name: seq2seq_tatoeba
+description: Seq2Seq LSTM baseline on Tatoeba with separate English and French BPE tokenizers.
 seed: 42
 
 data:
