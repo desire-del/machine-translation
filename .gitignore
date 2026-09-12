@@ -20,6 +20,8 @@ dist/
 data/*
 !data/.gitkeep
 artifacts/
+experiments/*
+!experiments/.gitkeep
 experiments/checkpoints/
 experiments/**/checkpoints/
 

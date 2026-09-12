@@ -163,7 +163,7 @@ model:
   dropout: 0.2
 
 training:
-  epochs: 10
+  epochs: 15
   learning_rate: 0.001
   teacher_forcing_ratio: 1.0
   gradient_clip_norm: 1.0
