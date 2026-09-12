@@ -1,1 +1,0 @@
-"""Shared model evaluation placeholder."""

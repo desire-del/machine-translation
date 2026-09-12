@@ -1,9 +1,0 @@
-schema_version: 1
-
-training:
-  seed: 42
-  epochs: 20
-  learning_rate: 0.001
-  gradient_clip_norm: 1.0
-  evaluate_every: 1
-  checkpoint_directory: experiments/checkpoints

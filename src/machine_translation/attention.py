@@ -1,1 +1,0 @@
-"""Bahdanau attention model placeholder."""
