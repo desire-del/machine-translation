@@ -5,7 +5,7 @@ import argparse
 import torch
 
 from machine_translation import (
-    build_seq2seq,
+    build_model,
     load_checkpoint,
     load_config,
     load_tokenizer,
@@ -47,7 +47,7 @@ def main():
         tokens.target_artifact_path,
         tokens.special_tokens,
     )
-    model = build_seq2seq(
+    model = build_model(
         source_tokenizer,
         target_tokenizer,
         tokens.special_tokens,

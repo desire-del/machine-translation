@@ -10,6 +10,34 @@ from tqdm.auto import tqdm
 
 from machine_translation.config import Config
 from machine_translation.data import get_data_loaders
+from machine_translation.seq2seq_att import Seq2SeqAtt
+
+
+def _forward_model(
+    model,
+    source_ids,
+    source_lengths,
+    source_padding_mask,
+    target_ids,
+    teacher_forcing_ratio,
+):
+    """Run one model while keeping architecture-specific inputs internal."""
+    if isinstance(model, Seq2SeqAtt):
+        logits, _ = model(
+            source_ids,
+            source_lengths,
+            source_padding_mask,
+            target_ids,
+            teacher_forcing_ratio,
+        )
+        return logits
+
+    return model(
+        source_ids,
+        source_lengths,
+        target_ids,
+        teacher_forcing_ratio,
+    )
 
 
 def _save_run_files(config, history, device, model):
@@ -134,12 +162,15 @@ def train_one_epoch(
         source_ids = batch["source_ids"].to(device)
         target_ids = batch["target_ids"].to(device)
         source_lengths = batch["source_lengths"]
+        source_padding_mask = batch["source_padding_mask"].to(device)
 
-        logits = model(
-            source_ids,
-            source_lengths,
-            target_ids,
-            teacher_forcing_ratio,
+        logits = _forward_model(
+            model=model,
+            source_ids=source_ids,
+            source_lengths=source_lengths,
+            source_padding_mask=source_padding_mask,
+            target_ids=target_ids,
+            teacher_forcing_ratio=teacher_forcing_ratio,
         )
         labels = target_ids[:, 1:]
 
@@ -172,11 +203,14 @@ def evaluate(model, val_loader, criterion, device):
             source_ids = batch["source_ids"].to(device)
             target_ids = batch["target_ids"].to(device)
             source_lengths = batch["source_lengths"]
+            source_padding_mask = batch["source_padding_mask"].to(device)
 
-            logits = model(
-                source_ids,
-                source_lengths,
-                target_ids,
+            logits = _forward_model(
+                model=model,
+                source_ids=source_ids,
+                source_lengths=source_lengths,
+                source_padding_mask=source_padding_mask,
+                target_ids=target_ids,
                 teacher_forcing_ratio=1.0,
             )
 

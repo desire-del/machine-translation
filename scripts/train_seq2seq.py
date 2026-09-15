@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from machine_translation import (
-    build_seq2seq,
+    build_model,
     load_config,
     load_tokenizer,
     train_model,
@@ -73,7 +73,7 @@ def main():
         tokens.special_tokens,
     )
 
-    model = build_seq2seq(
+    model = build_model(
         source_tokenizer,
         target_tokenizer,
         tokens.special_tokens,

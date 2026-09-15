@@ -75,11 +75,20 @@ class TokenizerConfig(ConfigModel):
 
 
 class ModelConfig(ConfigModel):
-    type: Literal["seq2seq"]
+    type: Literal["seq2seq", "seq2seq_att"]
     embedding_dim: int = Field(gt=0)
     hidden_dim: int = Field(gt=0)
+    att_dim: int | None = Field(default=None, gt=0)
     num_layers: int = Field(gt=0)
     dropout: float = Field(ge=0, lt=1)
+
+    @model_validator(mode="after")
+    def validate_attention_dimension(self):
+        if self.type == "seq2seq_att" and self.att_dim is None:
+            raise ValueError("att_dim is required when model type is 'seq2seq_att'")
+        if self.type == "seq2seq" and self.att_dim is not None:
+            raise ValueError("att_dim is only valid when model type is 'seq2seq_att'")
+        return self
 
 
 class TrainingConfig(ConfigModel):
@@ -112,6 +121,9 @@ class Config(ConfigModel):
     def snapshot(self):
         """Return a portable dictionary for run artifacts and checkpoints."""
         content = self.model_dump(mode="json")
+        if content["model"]["att_dim"] is None:
+            # Keep snapshots of existing Seq2Seq experiments backward compatible.
+            del content["model"]["att_dim"]
         paths = {
             "data": ("raw_path", "train_path", "validation_path", "test_path"),
             "tokenizer": ("source_artifact_path", "target_artifact_path"),

@@ -18,7 +18,7 @@ structure over training frameworks and production infrastructure.
 | Stage | Status | Main question |
 | --- | --- | --- |
 | Seq2Seq LSTM | Implemented | How limiting is a fixed-size context vector? |
-| Bahdanau attention | Planned | Does attention improve long-sequence translation? |
+| Bahdanau attention | Implemented | Does attention improve long-sequence translation? |
 | Small Transformer | Planned | Can self-attention replace recurrence? |
 | Comparative benchmark | Planned | What are the quality and compute trade-offs? |
 
@@ -116,6 +116,12 @@ padding is applied later by the DataLoader.
 uv run python scripts/train_seq2seq.py
 ```
 
+Select the Bahdanau-attention architecture with its dedicated configuration:
+
+```bash
+uv run python scripts/train_seq2seq.py --config configs/seq2seq_att_tatoeba.yaml
+```
+
 Training saves the best validation checkpoint and the most recent checkpoint.
 To run a temporary trial without writing an experiment directory:
 
@@ -187,6 +193,19 @@ data.
 
 Early stopping counts validation checks without an improvement greater than
 `min_delta`. Set `patience: null` to disable it.
+
+For the attention model, select `seq2seq_att` and provide its required positive
+attention dimension:
+
+```yaml
+model:
+  type: seq2seq_att
+  embedding_dim: 256
+  hidden_dim: 512
+  att_dim: 512
+  num_layers: 2
+  dropout: 0.2
+```
 
 ### Experiment naming
 
@@ -310,7 +329,9 @@ batch and never exceed `max_sequence_length`.
     ├── config.py
     ├── data.py
     ├── tokenization.py
+    ├── modeling.py
     ├── seq2seq.py
+    ├── seq2seq_att.py
     ├── training.py
     └── inference.py
 ```
@@ -325,7 +346,8 @@ visualization, and experimental analysis rather than core model logic.
 - [x] Vanilla Seq2Seq LSTM baseline
 - [x] Greedy and beam-search decoding
 - [x] Saved runs, checkpoint resume, and early stopping
-- [ ] Bahdanau attention and alignment visualizations
+- [x] Bahdanau attention
+- [ ] Attention alignment visualizations
 - [ ] Small encoder-decoder Transformer
 - [ ] BLEU and chrF evaluation on the held-out test set
 - [ ] Quality by sentence length and decoding latency

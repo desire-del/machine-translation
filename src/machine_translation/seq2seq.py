@@ -159,6 +159,10 @@ def build_seq2seq(
     model_config,
 ):
     """Build Seq2Seq with vocabulary sizes and pad IDs from the tokenizers."""
+    if model_config.type != "seq2seq":
+        raise ValueError(
+            "build_seq2seq requires a model config with type 'seq2seq'"
+        )
     return Seq2Seq(
         source_vocab_size=source_tokenizer.get_vocab_size(),
         target_vocab_size=target_tokenizer.get_vocab_size(),

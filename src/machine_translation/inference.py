@@ -2,6 +2,7 @@
 
 import torch
 
+from machine_translation.seq2seq_att import Seq2SeqAtt
 from machine_translation.tokenization import get_special_token_ids
 
 
@@ -37,7 +38,12 @@ def translate(
         add_special_tokens=True,
     ).ids
     source_ids = torch.tensor([source_ids], dtype=torch.long, device=device)
-    source_lengths = torch.tensor([source_ids.size(1)])
+    source_special_ids = get_special_token_ids(
+        source_tokenizer,
+        tokenizer_config.special_tokens,
+    )
+    source_padding_mask = source_ids.eq(source_special_ids["pad"])
+    source_lengths = (~source_padding_mask).sum(dim=1)
 
     special_ids = get_special_token_ids(
         target_tokenizer,
@@ -45,7 +51,14 @@ def translate(
     )
 
     with torch.inference_mode():
-        hidden, cell = model.encoder(source_ids, source_lengths)
+        if isinstance(model, Seq2SeqAtt):
+            encoder_states, hidden, cell = model.encoder(
+                source_ids,
+                source_lengths,
+            )
+            x1 = model.decoder.att.project_encoder(encoder_states)
+        else:
+            hidden, cell = model.encoder(source_ids, source_lengths)
         beams = [([], 0.0, hidden, cell, False)]
 
         for _ in range(data_config.max_sequence_length - 1):
@@ -62,11 +75,21 @@ def translate(
                     dtype=torch.long,
                     device=device,
                 )
-                logits, next_hidden, next_cell = model.decoder(
-                    decoder_input,
-                    hidden,
-                    cell,
-                )
+                if isinstance(model, Seq2SeqAtt):
+                    logits, next_hidden, next_cell, _ = model.decoder(
+                        encoder_states,
+                        source_padding_mask,
+                        decoder_input,
+                        hidden,
+                        cell,
+                        x1=x1,
+                    )
+                else:
+                    logits, next_hidden, next_cell = model.decoder(
+                        decoder_input,
+                        hidden,
+                        cell,
+                    )
                 log_probs = logits[0, -1].log_softmax(dim=-1)
                 log_probs[special_ids["pad"]] = -torch.inf
                 log_probs[special_ids["bos"]] = -torch.inf
