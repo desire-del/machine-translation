@@ -5,6 +5,7 @@ from machine_translation.config import (
     load_config,
 )
 from machine_translation.data import get_data_loaders
+from machine_translation.experiments import LoadedExperiment, load_experiment
 from machine_translation.inference import translate
 from machine_translation.modeling import build_model
 from machine_translation.seq2seq import Seq2Seq, build_seq2seq
@@ -14,6 +15,7 @@ from machine_translation.training import load_checkpoint, train_model
 
 __all__ = [
     "Config",
+    "LoadedExperiment",
     "Seq2Seq",
     "Seq2SeqAtt",
     "build_model",
@@ -21,6 +23,7 @@ __all__ = [
     "build_seq2seqatt",
     "get_data_loaders",
     "load_checkpoint",
+    "load_experiment",
     "load_config",
     "load_tokenizer",
     "train_model",

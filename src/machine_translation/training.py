@@ -1,5 +1,6 @@
 import json
 import math
+from pathlib import Path
 from time import perf_counter
 
 import torch
@@ -11,6 +12,27 @@ from tqdm.auto import tqdm
 from machine_translation.config import Config
 from machine_translation.data import get_data_loaders
 from machine_translation.seq2seq_att import Seq2SeqAtt
+
+
+def resolve_checkpoint(path, checkpoint="best"):
+    """Resolve a checkpoint file or a run/checkpoints directory without guessing."""
+    if checkpoint not in ("best", "last"):
+        raise ValueError("checkpoint must be 'best' or 'last'")
+    path = Path(path).expanduser().resolve()
+    if path.is_file():
+        return path
+    if not path.is_dir():
+        raise FileNotFoundError(f"Checkpoint path not found: {path}")
+
+    candidates = [path / f"{checkpoint}.pt", path / "checkpoints" / f"{checkpoint}.pt"]
+    candidates = [candidate for candidate in candidates if candidate.is_file()]
+    if len(candidates) > 1:
+        raise ValueError(
+            f"Ambiguous checkpoint directory: {path}. Provide the exact .pt file."
+        )
+    if not candidates:
+        raise FileNotFoundError(f"No {checkpoint}.pt checkpoint found in {path}")
+    return candidates[0]
 
 
 def _forward_model(
@@ -125,8 +147,9 @@ def save_checkpoint(
     )
 
 
-def load_checkpoint(path, model, device, optimizer=None, config=None):
-    """Load model weights and, when provided, the optimizer state."""
+def load_checkpoint(path, model, device, optimizer=None, config=None, checkpoint="best"):
+    """Load weights from a file or directory and optionally optimizer state."""
+    path = resolve_checkpoint(path, checkpoint=checkpoint)
     checkpoint = torch.load(path, map_location=device, weights_only=True)
     if config is not None:
         _validate_resume(checkpoint, config)
@@ -278,6 +301,7 @@ def train_model(
             device=device,
             optimizer=optimizer,
             config=config,
+            checkpoint="last",
         )
         start_epoch = checkpoint["epoch"]
         history = checkpoint["history"]

@@ -29,7 +29,8 @@ The current baseline includes:
 - configurable teacher forcing and gradient clipping;
 - validation loss, perplexity, early stopping, and resumable checkpoints;
 - greedy decoding and length-normalized beam search;
-- reproducible runs organized by experiment name and random seed.
+- reproducible runs organized by experiment name and random seed;
+- portable experiment loading and side-by-side run analysis.
 
 ## Experimental pipeline
 
@@ -147,6 +148,40 @@ Beam search is used by default. Greedy decoding is available with:
 uv run python scripts/translate.py "The student reads a book." --beam-size 1
 ```
 
+Load a saved experiment directly, using its own `config.yaml` rather than the
+current YAML under `configs/`:
+
+```bash
+uv run python scripts/translate.py "I love cats." \
+  --run-dir experiments/seq2seq_att_tatoeba/seed_42
+```
+
+`best.pt` is selected by default. Add `--checkpoint-kind last` to select
+`last.pt`. The loader accepts either the run directory, its `checkpoints/`
+directory, or an exact checkpoint file. `--checkpoint PATH` also uses the saved
+configuration when neither `--config` nor `--seed` is provided. A missing best
+checkpoint does not silently fall back to last.
+
+In Python or a notebook:
+
+```python
+from machine_translation import load_experiment
+
+loaded = load_experiment("experiments/seq2seq_att_tatoeba/seed_42", device="cpu")
+model = loaded.model
+config = loaded.config
+source_tokenizer = loaded.source_tokenizer
+target_tokenizer = loaded.target_tokenizer
+print(loaded.checkpoint_path, loaded.epoch)
+```
+
+The configuration must be beside the checkpoint or in the parent run directory
+when checkpoints are stored under `checkpoints/`. Tokenizer artifacts referenced
+by that configuration must still exist; relative artifact paths are resolved
+against the repository root, as for ordinary experiment configs. Renaming the
+run directory does not change which checkpoint is loaded. Models are restored
+in evaluation mode, and loading uses PyTorch's `weights_only=True` mode.
+
 ## Configuration
 
 One self-contained YAML file describes one experimental condition. The default
@@ -221,7 +256,7 @@ Examples:
 | --- | --- |
 | `seq2seq_tatoeba` | Vanilla Seq2Seq baseline |
 | `seq2seq_tatoeba_tf050` | Seq2Seq with a 0.5 teacher-forcing ratio |
-| `bahdanau_tatoeba` | Bahdanau-attention experiment |
+| `seq2seq_att_tatoeba` | Bahdanau-attention experiment |
 | `transformer_tatoeba_small` | Small Transformer experiment |
 
 Keep `name` concise and filesystem-friendly. Use lowercase words separated by
@@ -279,6 +314,26 @@ experiments/seq2seq_tatoeba/seed_42/
 Existing runs are never overwritten silently. Select another seed, resume the
 run, or use `--no-save` for a disposable trial.
 
+### Compare saved runs
+
+Install the development dependencies and open the results notebook:
+
+```bash
+uv sync --group dev
+uv run jupyter lab notebooks/02_seq2seq_results.ipynb
+```
+
+The notebook discovers every run containing an `experiments/**/config.yaml`,
+loads each model on CPU from its own saved configuration, and compares run
+settings, parameter counts, training histories, validation curves, epoch times,
+and example translations. Runs with missing or incompatible artifacts are
+reported without preventing the remaining runs from loading.
+
+It selects `best.pt` by default. Change `CHECKPOINT_KIND` in the notebook to
+`"last"` when the latest checkpoint is the intended comparison point. The
+checkpoint epoch and the number of recorded history epochs are shown separately
+because a best checkpoint can precede the end of training.
+
 ## Evaluation protocol
 
 Development currently uses token-level validation loss and perplexity for
@@ -291,8 +346,17 @@ models on the same untouched test split and report:
 - greedy and beam-search inference latency;
 - qualitative errors such as omissions, repetitions, and mistranslated names.
 
-No test-set benchmark is reported yet because the repository is still at the
-Seq2Seq baseline stage.
+No final test-set benchmark is reported yet. The results notebook supports
+side-by-side qualitative inspection, while BLEU, chrF, length-stratified
+quality, and latency measurements remain roadmap items.
+
+## Tests
+
+Run the experiment-loader, CLI, and results-notebook regression tests with:
+
+```bash
+uv run python -m unittest discover -s tests -v
+```
 
 ## Data contract
 
@@ -325,15 +389,17 @@ batch and never exceed `max_sequence_length`.
 │   ├── train_tokenizer.py
 │   ├── train_seq2seq.py
 │   └── translate.py
-└── src/machine_translation/
+├── src/machine_translation/
     ├── config.py
     ├── data.py
+    ├── experiments.py
     ├── tokenization.py
     ├── modeling.py
     ├── seq2seq.py
     ├── seq2seq_att.py
     ├── training.py
     └── inference.py
+└── tests/                       Loader, CLI, and notebook regression tests
 ```
 
 Model implementations live in `src/`. Notebooks are reserved for inspection,
